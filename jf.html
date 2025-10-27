@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON整形ツール</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root {
+            --spacing-company: 1rem;
+        }
+
+    /* ライトテーマ（デフォルト） */
+    :root,
+    [data-theme="light"] {
+        --background-color: #ffffff;
+        --card-background-color: #f8f9fa;
+        --text-color: #1f2937;
+        --muted-color: #6b7280;
+        --border-color: #e5e7eb;
+        --primary: #2563eb;
+        --primary-hover: #eff6ff;
+        --button-background: #ffffff;
+        --button-border: #d1d5db;
+        --success-color: #10b981;
+        --error-color: #ef4444;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    /* ダークテーマ */
+    [data-theme="dark"] {
+        --background-color: #1a1a1a;
+        --card-background-color: #2d2d2d;
+        --text-color: #e5e7eb;
+        --muted-color: #9ca3af;
+        --border-color: #374151;
+        --primary: #3b82f6;
+        --primary-hover: #1e3a5f;
+        --button-background: #2d2d2d;
+        --button-border: #374151;
+        --success-color: #10b981;
+        --error-color: #ef4444;
+        --shadow-color: rgba(0, 0, 0, 0.3);
+    }
+    
+    /* システムテーマ（自動） */
+    [data-theme="auto"] {
+        --background-color: #ffffff;
+        --card-background-color: #f8f9fa;
+        --text-color: #1f2937;
+        --muted-color: #6b7280;
+        --border-color: #e5e7eb;
+        --primary: #2563eb;
+        --primary-hover: #eff6ff;
+        --button-background: #ffffff;
+        --button-border: #d1d5db;
+        --success-color: #10b981;
+        --error-color: #ef4444;
+        --shadow-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        [data-theme="auto"] {
+            --background-color: #1a1a1a;
+            --card-background-color: #2d2d2d;
+            --text-color: #e5e7eb;
+            --muted-color: #9ca3af;
+            --border-color: #374151;
+            --primary: #3b82f6;
+            --primary-hover: #1e3a5f;
+            --button-background: #2d2d2d;
+            --button-border: #374151;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+    }
+    
+    html {
+        background-color: var(--background-color);
+        transition: background-color 0.3s;
+    }
+    
+    body {
+        padding: var(--spacing-company);
+        max-width: 1400px;
+        margin: 0 auto;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        transition: background-color 0.3s, color 0.3s;
+    }
+    
+    .header {
+        margin-bottom: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+    }
+    
+    .header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+    
+    .settings-button {
+        position: absolute;
+        top: 0;
+        right: 0;
+    }
+    
+    .tabs-container {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.25rem;
+        align-items: center;
+    }
+    
+    #tabsList {
+        display: flex;
+        gap: 0.25rem;
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    
+    #tabsList::-webkit-scrollbar {
+        height: 4px;
+    }
+    
+    #tabsList::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 2px;
+    }
+    
+    .tab {
+        padding: 0.5rem 1rem;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        border-radius: 8px 8px 0 0;
+        transition: all 0.2s;
+        color: var(--muted-color);
+        font-size: 0.875rem;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+        min-width: 100px;
+        max-width: 200px;
+    }
+    
+    .tab:hover {
+        background: var(--card-background-color);
+        color: var(--text-color);
+    }
+    
+    .tab.active {
+        background: var(--card-background-color);
+        color: var(--text-color);
+        font-weight: 600;
+        border-bottom: 2px solid var(--primary);
+    }
+    
+    .tab-title {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .tab-close {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: all 0.2s;
+        font-size: 16px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    
+    .tab:hover .tab-close {
+        opacity: 0.6;
+    }
+    
+    .tab-close:hover {
+        opacity: 1 !important;
+        background: var(--error-color);
+        color: white;
+    }
+    
+    .add-tab-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        color: var(--muted-color);
+        flex-shrink: 0;
+    }
+    
+    .add-tab-btn:hover {
+        background: var(--primary-hover);
+        color: var(--primary);
+    }
+    
+    .add-tab-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .tab-context-menu {
+        position: fixed;
+        background: var(--card-background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px var(--shadow-color);
+        z-index: 1000;
+        min-width: 150px;
+        padding: 0.5rem 0;
+    }
+    
+    .tab-menu-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-color);
+        transition: background 0.2s;
+    }
+    
+    .tab-menu-item:hover {
+        background: var(--primary-hover);
+    }
+    
+    .tab-menu-item-danger:hover {
+        background: var(--error-color);
+        color: white;
+    }
+    
+    .tab-menu-item svg {
+        flex-shrink: 0;
+    }
+    
+    .rename-dialog-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    
+    .rename-dialog {
+        background: var(--background-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        min-width: 300px;
+        max-width: 90%;
+        box-shadow: 0 8px 24px var(--shadow-color);
+    }
+    
+    .rename-dialog-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-color);
+    }
+    
+    .rename-dialog-input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 1rem;
+        background: var(--card-background-color);
+        color: var(--text-color);
+        margin-bottom: 1rem;
+    }
+    
+    .rename-dialog-input:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+    
+    .rename-dialog-buttons {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
+    
+    .rename-dialog-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    
+    .rename-dialog-btn:hover {
+        opacity: 0.8;
+    }
+    
+    .rename-dialog-btn-cancel {
+        background: var(--card-background-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+    }
+    
+    .rename-dialog-btn-ok {
+        background: var(--primary);
+        color: white;
+    }
+    
+    .toolbar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+    
+    .btn-icon {
+        padding: 0.5rem;
+        min-width: auto;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        color: var(--text-color);
+        width: 36px;
+        height: 36px;
+    }
+    
+    .btn-icon:hover {
+        background: var(--primary-hover);
+    }
+    
+    .btn-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .btn-primary {
+        background: var(--primary);
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: var(--primary);
+        opacity: 0.9;
+    }
+    
+    .divider {
+        width: 1px;
+        height: 24px;
+        background: var(--border-color);
+    }
+    
+    .textarea-container {
+        position: relative;
+    }
+    
+    .copy-btn-overlay {
+        position: absolute;
+        top: 2rem;
+        right: 0.5rem;
+        z-index: 10;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: none;
+        background: rgba(128, 128, 128, 0.1);
+        cursor: pointer;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        color: var(--muted-color);
+        opacity: 0.6;
+    }
+    
+    .copy-btn-overlay:hover {
+        background: var(--primary);
+        color: white;
+        opacity: 1;
+    }
+    
+    .copy-btn-overlay svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .textarea-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        display: block;
+        color: var(--muted-color);
+    }
+    
+    textarea {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        min-height: 400px;
+        resize: vertical;
+        width: 100%;
+        line-height: 1.5;
+        background: var(--card-background-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+    
+    .status-bar {
+        font-size: 0.75rem;
+        color: var(--muted-color);
+        margin-top: 0.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .stats-inline {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .stat-item {
+        display: flex;
+        gap: 0.25rem;
+    }
+    
+    .stat-item span:first-child {
+        font-weight: 600;
+    }
+    
+    .error-message, .success-message {
+        padding: 0.5rem 1rem;
+        border-radius: var(--border-radius);
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+        display: none;
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 1000;
+        box-shadow: 0 2px 8px var(--shadow-color);
+    }
+    
+    .error-message {
+        background: var(--error-color);
+        color: white;
+    }
+    
+    .success-message {
+        background: var(--success-color);
+        color: white;
+    }
+    
+    .error-message.show, .success-message.show {
+        display: block;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    @media (max-width: 768px) {
+        .main-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+    }
+    
+    .dropdown-menu {
+        position: relative;
+    }
+    
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 0.5rem);
+        background: var(--card-background-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        padding: 0.5rem;
+        min-width: 200px;
+        box-shadow: 0 4px 12px var(--shadow-color);
+        z-index: 100;
+        opacity: 1;
+    }
+    
+    .dropdown-menu.active .dropdown-content {
+        display: block;
+        animation: fadeIn 0.2s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .menu-item {
+        padding: 0.5rem;
+        cursor: pointer;
+        border-radius: calc(var(--border-radius) / 2);
+        transition: background 0.2s;
+        font-size: 0.875rem;
+        color: var(--text-color);
+    }
+    
+    .menu-item:hover {
+        background: var(--primary-hover);
+    }
+    
+    .menu-section {
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .menu-section:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    
+    .menu-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted-color);
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+    }
+    
+    .option-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-color);
+    }
+    
+    .option-item.indent-option {
+        display: grid;
+        grid-template-columns: auto auto;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .indent-control {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .indent-control button {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 1px solid var(--border-color);
+        background: var(--background-color);
+        color: var(--text-color);
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+    
+    .indent-control button:hover {
+        background: var(--primary-hover);
+    }
+    
+    .indent-control span {
+        min-width: 20px;
+        text-align: center;
+        font-size: 0.875rem;
+    }
+    
+    .option-item input[type="number"] {
+        width: 50px;
+        padding: 0;
+        font-size: 0.875rem;
+        background: var(--background-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        border-radius: 3px;
+        text-align: center;
+        height: 1.5em;
+        line-height: 1.5em;
+    }
+    
+    .option-item input[type="checkbox"] {
+        margin: 0;
+    }
+    
+    .option-item label {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        margin: 0;
+        color: var(--text-color);
+        font-size: 0.875rem;
+    }
+    
+    .theme-selector {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        background: var(--background-color);
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .theme-option {
+        flex: 1;
+        padding: 0.375rem 0.5rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: center;
+        font-size: 0.75rem;
+        background: transparent;
+        color: var(--text-color);
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+    
+    .theme-option:hover {
+        background: var(--card-background-color);
+    }
+    
+    .theme-option.active {
+        background: var(--primary);
+        color: white;
+    }
+</style>
+```
+
+</head>
+<body>
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+
+```
+<div class="header">
+    <h1>JSON Formatter</h1>
+    <div class="settings-button">
+        <div class="dropdown-menu" id="optionsMenu">
+            <button class="btn-icon" onclick="event.stopPropagation(); app.toggleMenu('optionsMenu')" title="設定">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
+            </button>
+            <div class="dropdown-content">
+                <div class="menu-section">
+                    <div class="menu-title">テーマ</div>
+                    <div class="theme-selector">
+                        <div class="theme-option" data-theme="light" onclick="app.setTheme('light')">
+                            ライト
+                        </div>
+                        <div class="theme-option" data-theme="dark" onclick="app.setTheme('dark')">
+                            ダーク
+                        </div>
+                        <div class="theme-option" data-theme="auto" onclick="app.setTheme('auto')">
+                            自動
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-section">
+                    <div class="menu-title">整形オプション</div>
+                    <div class="option-item indent-option">
+                        <span>インデント:</span>
+                        <div class="indent-control">
+                            <button onclick="app.decrementIndent()">-</button>
+                            <span id="indentValue">2</span>
+                            <button onclick="app.incrementIndent()">+</button>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <label>
+                            <input type="checkbox" id="sortKeys" role="switch">
+                            キーをソート
+                        </label>
+                    </div>
+                </div>
+                <div class="menu-section">
+                    <div class="menu-title">データ管理</div>
+                    <div class="menu-item" onclick="app.exportData()">データ保存</div>
+                    <div class="menu-item" onclick="app.importData()">データ読込</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="tabs-container">
+    <div id="tabsList"></div>
+    <button class="add-tab-btn" onclick="app.addTab()" title="新しいタブ">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+    </button>
+</div>
+
+<div class="toolbar">
+    <button class="btn-icon btn-primary" onclick="app.format()" title="整形する (Ctrl+Enter)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+        </svg>
+    </button>
+    <button class="btn-icon" onclick="app.minify()" title="圧縮する">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 7h16M4 12h10M4 17h16"/>
+        </svg>
+    </button>
+    <button class="btn-icon" onclick="app.copyOutput()" title="コピー">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+    </button>
+    <button class="btn-icon" onclick="app.clear()" title="クリア (Ctrl+K)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+    </button>
+    
+    <div class="divider"></div>
+    
+    <button class="btn-icon" onclick="app.urlDecode()" title="URLデコード">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+        </svg>
+    </button>
+    <button class="btn-icon" onclick="app.urlEncode()" title="URLエンコード">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+    </button>
+    
+    <div class="divider"></div>
+    
+    <div class="dropdown-menu" id="samplesMenu">
+        <button class="btn-icon" onclick="event.stopPropagation(); app.toggleMenu('samplesMenu')" title="サンプル">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+        </button>
+        <div class="dropdown-content">
+            <div class="menu-title">サンプルJSON</div>
+            <div class="menu-item" onclick="app.loadExample('simple')">シンプル</div>
+            <div class="menu-item" onclick="app.loadExample('nested')">ネスト構造</div>
+            <div class="menu-item" onclick="app.loadExample('array')">配列</div>
+            <div class="menu-item" onclick="app.loadExample('complex')">複雑</div>
+        </div>
+    </div>
+</div>
+
+<div class="main-grid">
+    <div class="textarea-container">
+        <label class="textarea-label" for="inputJson">INPUT</label>
+        <button class="copy-btn-overlay" onclick="app.copyInput()" title="コピー">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+        </button>
+        <textarea 
+            id="inputJson" 
+            placeholder='{"key": "value"}'
+            spellcheck="false"
+            aria-label="入力JSON"
+        ></textarea>
+        <div class="status-bar">
+            <span id="inputCount">0 chars</span>
+        </div>
+    </div>
+    
+    <div class="textarea-container">
+        <label class="textarea-label" for="outputJson">OUTPUT</label>
+        <button class="copy-btn-overlay" onclick="app.copyOutput()" title="コピー">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+        </button>
+        <textarea 
+            id="outputJson" 
+            placeholder="整形されたJSONがここに表示されます"
+            readonly
+            spellcheck="false"
+            aria-label="出力JSON"
+        ></textarea>
+        <div class="status-bar">
+            <span id="outputCount">0 chars</span>
+            <div class="stats-inline" id="statsInline">
+                <div class="stat-item" title="行数"><span id="statLines">-</span><span>行</span></div>
+                <div class="stat-item" title="最大深度"><span id="statDepth">-</span><span>深</span></div>
+                <div class="stat-item" title="キー数"><span id="statKeys">-</span><span>キー</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    'use strict';
+    
+    // ===========================
+    // JSON整形アプリケーション
+    // ===========================
+    class JSONFormatterApp {
+        constructor() {
+            this.VERSION = '2.0.0';
+            this.STORAGE_KEY = 'json_formatter_tabs';
+            this.THEME_KEY = 'json_formatter_theme';
+            
+            this.tabs = [];
+            this.activeTabIndex = 0;
+            this.nextTabId = 1;
+            this.indentSize = 2;
+            
+            this.init();
+        }
+        
+        init() {
+            console.log(`JSON Formatter v${this.VERSION} initialized`);
+            
+            // テーマ読み込み
+            this.loadTheme();
+            
+            // タブデータ読み込み
+            this.loadTabs();
+            
+            // タブが1つもない場合は作成
+            if (this.tabs.length === 0) {
+                this.addTab();
+            } else {
+                this.renderTabs();
+                this.switchTab(this.activeTabIndex);
+            }
+            
+            // グローバルイベントリスナー
+            this.attachEventListeners();
+        }
+        
+        // タブ追加
+        addTab() {
+            const newTab = {
+                id: this.nextTabId++,
+                title: `タブ ${this.tabs.length + 1}`,
+                input: '',
+                output: ''
+            };
+            
+            this.tabs.push(newTab);
+            this.activeTabIndex = this.tabs.length - 1;
+            this.renderTabs();
+            this.loadTabContent(this.activeTabIndex);
+            this.saveTabs();
+        }
+        
+        // タブ削除
+        removeTab(index, event) {
+            event.stopPropagation();
+            
+            if (this.tabs.length === 1) {
+                this.showError('最後のタブは削除できません');
+                return;
+            }
+            
+            // 現在のタブのデータを保存
+            this.saveCurrentTabData();
+            
+            this.tabs.splice(index, 1);
+            
+            // アクティブタブが削除された場合
+            if (this.activeTabIndex >= this.tabs.length) {
+                this.activeTabIndex = this.tabs.length - 1;
+            } else if (this.activeTabIndex > index) {
+                this.activeTabIndex--;
+            }
+            
+            this.renderTabs();
+            this.loadTabContent(this.activeTabIndex);
+            this.saveTabs();
+        }
+        
+        // タブ切り替え
+        switchTab(index) {
+            if (index === this.activeTabIndex) return;
+            
+            // 現在のタブのデータを保存
+            this.saveCurrentTabData();
+            
+            this.activeTabIndex = index;
+            this.renderTabs();
+            this.loadTabContent(index);
+        }
+        
+        // 現在のタブデータを保存
+        saveCurrentTabData() {
+            if (this.tabs.length === 0) return;
+            
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            
+            if (inputEl && this.tabs[this.activeTabIndex]) {
+                this.tabs[this.activeTabIndex].input = inputEl.value;
+            }
+            if (outputEl && this.tabs[this.activeTabIndex]) {
+                this.tabs[this.activeTabIndex].output = outputEl.value;
+            }
+        }
+        
+        // タブコンテンツを読み込み
+        loadTabContent(index) {
+            const tab = this.tabs[index];
+            if (!tab) return;
+            
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            
+            if (inputEl) inputEl.value = tab.input;
+            if (outputEl) outputEl.value = tab.output;
+            
+            this.updateCharCount();
+            
+            // 統計情報更新
+            if (tab.output) {
+                try {
+                    const parsed = JSON.parse(tab.input);
+                    this.updateStats(parsed, tab.output);
+                } catch (e) {
+                    this.clearStats();
+                }
+            } else {
+                this.clearStats();
+            }
+        }
+        
+        // タブタイトル変更
+        renameTab(index, event) {
+            event.stopPropagation();
+            
+            const tab = this.tabs[index];
+            if (!tab) return;
+            
+            // カスタムダイアログを表示
+            this.showRenameDialog(index, tab.title);
+        }
+        
+        // タブ名変更ダイアログを表示
+        showRenameDialog(index, currentTitle) {
+            // 既存のダイアログを削除
+            const existingDialog = document.getElementById('renameDialog');
+            if (existingDialog) {
+                existingDialog.remove();
+            }
+            
+            // ダイアログを作成
+            const dialog = document.createElement('div');
+            dialog.id = 'renameDialog';
+            dialog.className = 'rename-dialog-overlay';
+            dialog.innerHTML = `
+                <div class="rename-dialog">
+                    <div class="rename-dialog-header">タブ名を変更</div>
+                    <input type="text" class="rename-dialog-input" value="${this.escapeHtml(currentTitle)}" id="renameInput">
+                    <div class="rename-dialog-buttons">
+                        <button class="rename-dialog-btn rename-dialog-btn-cancel" onclick="app.closeRenameDialog()">キャンセル</button>
+                        <button class="rename-dialog-btn rename-dialog-btn-ok" onclick="app.confirmRename(${index})">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(dialog);
+            
+            // 入力フィールドにフォーカスして選択
+            setTimeout(() => {
+                const input = document.getElementById('renameInput');
+                input.focus();
+                input.select();
+                
+                // Enterキーで確定
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.confirmRename(index);
+                    }
+                });
+            }, 100);
+        }
+        
+        // タブ名変更を確定
+        confirmRename(index) {
+            const input = document.getElementById('renameInput');
+            const newTitle = input.value.trim();
+            
+            if (newTitle && this.tabs[index]) {
+                this.tabs[index].title = newTitle;
+                this.renderTabs();
+                this.saveTabs();
+                this.showSuccess('タブ名を変更しました');
+            }
+            
+            this.closeRenameDialog();
+        }
+        
+        // ダイアログを閉じる
+        closeRenameDialog() {
+            const dialog = document.getElementById('renameDialog');
+            if (dialog) {
+                dialog.remove();
+            }
+        }
+        
+        // タブをレンダリング
+        renderTabs() {
+            const tabsList = document.getElementById('tabsList');
+            
+            tabsList.innerHTML = this.tabs.map((tab, index) => `
+                <div class="tab ${index === this.activeTabIndex ? 'active' : ''}" 
+                     ondblclick="app.renameTab(${index}, event)"
+                     oncontextmenu="app.showTabMenu(${index}, event)"
+                     ontouchstart="app.handleTabTouchStart(${index}, event)"
+                     ontouchend="app.handleTabTouchEnd(${index}, event)"
+                     onclick="app.switchTab(${index})">
+                    <span class="tab-title">${this.escapeHtml(tab.title)}</span>
+                    ${this.tabs.length > 1 ? `
+                        <span class="tab-close" onclick="app.removeTab(${index}, event)">×</span>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // タブタッチ開始（長押し検出用）
+        handleTabTouchStart(index, event) {
+            this.touchStartTime = Date.now();
+            this.touchTimer = setTimeout(() => {
+                this.showTabMenu(index, event);
+            }, 500); // 500ms長押しでメニュー表示
+        }
+        
+        // タブタッチ終了
+        handleTabTouchEnd(index, event) {
+            clearTimeout(this.touchTimer);
+            const touchDuration = Date.now() - this.touchStartTime;
+            
+            // 短いタップならタブ切り替え
+            if (touchDuration < 500) {
+                // タップ処理はonclickで処理される
+            }
+        }
+        
+        // タブメニュー表示
+        showTabMenu(index, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // 既存のメニューを削除
+            const existingMenu = document.getElementById('tabContextMenu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+            
+            // メニューを作成
+            const menu = document.createElement('div');
+            menu.id = 'tabContextMenu';
+            menu.className = 'tab-context-menu';
+            menu.innerHTML = `
+                <div class="tab-menu-item" data-action="rename" data-index="${index}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    名前を変更
+                </div>
+                ${this.tabs.length > 1 ? `
+                    <div class="tab-menu-item tab-menu-item-danger" data-action="delete" data-index="${index}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        削除
+                    </div>
+                ` : ''}
+            `;
+            
+            // 位置を設定
+            document.body.appendChild(menu);
+            
+            const x = event.touches ? event.touches[0].clientX : event.clientX;
+            const y = event.touches ? event.touches[0].clientY : event.clientY;
+            
+            // 画面外に出ないように調整
+            const menuRect = menu.getBoundingClientRect();
+            const left = Math.min(x, window.innerWidth - menuRect.width - 10);
+            const top = Math.min(y, window.innerHeight - menuRect.height - 10);
+            
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            
+            // メニューアイテムのクリックイベント
+            menu.querySelectorAll('.tab-menu-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = item.getAttribute('data-action');
+                    const idx = parseInt(item.getAttribute('data-index'));
+                    
+                    this.closeTabMenu();
+                    
+                    if (action === 'rename') {
+                        this.renameTabFromMenu(idx);
+                    } else if (action === 'delete') {
+                        this.removeTabFromMenu(idx);
+                    }
+                });
+            });
+            
+            // メニュー外をクリックしたら閉じる
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    if (!menu.contains(e.target)) {
+                        this.closeTabMenu();
+                    }
+                };
+                document.addEventListener('click', closeHandler, { once: true });
+                document.addEventListener('touchstart', closeHandler, { once: true });
+            }, 0);
+        }
+        
+        // タブメニューを閉じる
+        closeTabMenu() {
+            const menu = document.getElementById('tabContextMenu');
+            if (menu) {
+                menu.remove();
+            }
+        }
+        
+        // メニューから名前変更
+        renameTabFromMenu(index) {
+            this.closeTabMenu();
+            this.renameTab(index, { stopPropagation: () => {} });
+        }
+        
+        // メニューから削除
+        removeTabFromMenu(index) {
+            this.closeTabMenu();
+            this.removeTab(index, { stopPropagation: () => {} });
+        }
+        
+        // HTMLエスケープ
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // タブデータ保存
+        saveTabs() {
+            // 現在のタブデータを保存
+            this.saveCurrentTabData();
+            
+            const data = {
+                version: this.VERSION,
+                nextTabId: this.nextTabId,
+                activeTabIndex: this.activeTabIndex,
+                tabs: this.tabs
+            };
+            
+            try {
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.error('Save failed:', e);
+                this.showError('保存に失敗しました');
+            }
+        }
+        
+        // タブデータ読み込み
+        loadTabs() {
+            try {
+                const stored = localStorage.getItem(this.STORAGE_KEY);
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    this.tabs = data.tabs || [];
+                    this.nextTabId = data.nextTabId || 1;
+                    this.activeTabIndex = data.activeTabIndex || 0;
+                }
+            } catch (e) {
+                console.error('Load failed:', e);
+            }
+        }
+        
+        // インデント増加
+        incrementIndent() {
+            if (this.indentSize < 8) {
+                this.indentSize++;
+                document.getElementById('indentValue').textContent = this.indentSize;
+            }
+        }
+        
+        // インデント減少
+        decrementIndent() {
+            if (this.indentSize > 1) {
+                this.indentSize--;
+                document.getElementById('indentValue').textContent = this.indentSize;
+            }
+        }
+        
+        // テーマ設定
+        setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem(this.THEME_KEY, theme);
+            
+            // アクティブボタンの更新
+            document.querySelectorAll('.theme-option').forEach(option => {
+                if (option.getAttribute('data-theme') === theme) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            });
+            
+            this.showSuccess(`テーマを${theme === 'light' ? 'ライト' : theme === 'dark' ? 'ダーク' : '自動'}に変更しました`);
+        }
+        
+        // テーマ読み込み
+        loadTheme() {
+            const savedTheme = localStorage.getItem(this.THEME_KEY) || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.body.setAttribute('data-theme', savedTheme);
+            
+            // アクティブボタンの更新
+            document.querySelectorAll('.theme-option').forEach(option => {
+                if (option.getAttribute('data-theme') === savedTheme) {
+                    option.classList.add('active');
+                }
+            });
+        }
+        
+        // イベントリスナー設定
+        attachEventListeners() {
+            // 入力時の自動保存とカウント更新
+            document.addEventListener('input', (e) => {
+                if (e.target.id === 'inputJson' || e.target.id === 'outputJson') {
+                    this.updateCharCount();
+                    // 自動保存（デバウンス付き）
+                    clearTimeout(this.saveTimeout);
+                    this.saveTimeout = setTimeout(() => this.saveTabs(), 500);
+                }
+            });
+            
+            // キーボードショートカット
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.format();
+                    } else if (e.key === 'k') {
+                        e.preventDefault();
+                        this.clear();
+                    }
+                }
+            });
+            
+            // メニュー外クリックで閉じる
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.dropdown-menu')) {
+                    this.closeAllMenus();
+                }
+            });
+            
+            // ページ離脱時の自動保存
+            window.addEventListener('beforeunload', () => {
+                this.saveTabs();
+            });
+        }
+        
+        // 文字数カウント更新
+        updateCharCount() {
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            const inputCountEl = document.getElementById('inputCount');
+            const outputCountEl = document.getElementById('outputCount');
+            
+            if (inputEl && inputCountEl) {
+                inputCountEl.textContent = `${inputEl.value.length} chars`;
+            }
+            
+            if (outputEl && outputCountEl) {
+                outputCountEl.textContent = `${outputEl.value.length} chars`;
+            }
+        }
+        
+        // JSON整形（現在のタブに対して）
+        format() {
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            const input = inputEl.value.trim();
+            
+            if (!input) {
+                this.showError('JSONを入力してください');
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(input);
+                const sortKeys = document.getElementById('sortKeys').checked;
+                
+                const formatted = sortKeys ? 
+                    this.formatWithSortedKeys(parsed, this.indentSize) :
+                    JSON.stringify(parsed, null, this.indentSize);
+                
+                outputEl.value = formatted;
+                this.updateStats(parsed, formatted);
+                this.showSuccess('JSONを整形しました');
+                this.updateCharCount();
+                this.saveTabs();
+                
+            } catch (error) {
+                this.showError(`JSONパースエラー: ${error.message}`);
+                this.clearStats();
+            }
+        }
+        
+        // JSON圧縮（現在のタブに対して）
+        minify() {
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            const input = inputEl.value.trim();
+            
+            if (!input) {
+                this.showError('JSONを入力してください');
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(input);
+                const minified = JSON.stringify(parsed);
+                
+                outputEl.value = minified;
+                this.updateStats(parsed, minified);
+                this.showSuccess('JSONを圧縮しました');
+                this.updateCharCount();
+                this.saveTabs();
+                
+            } catch (error) {
+                this.showError(`JSONパースエラー: ${error.message}`);
+                this.clearStats();
+            }
+        }
+        
+        // クリア（現在のタブに対して）
+        clear() {
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            
+            inputEl.value = '';
+            outputEl.value = '';
+            this.clearStats();
+            this.updateCharCount();
+            this.saveTabs();
+            this.showSuccess('クリアしました');
+        }
+        
+        // 出力コピー（現在のタブから）
+        async copyOutput() {
+            const outputEl = document.getElementById('outputJson');
+            const output = outputEl.value;
+            
+            if (!output) {
+                this.showError('コピーする内容がありません');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(output);
+                this.showSuccess('クリップボードにコピーしました');
+            } catch (error) {
+                outputEl.select();
+                document.execCommand('copy');
+                this.showSuccess('クリップボードにコピーしました');
+            }
+        }
+        
+        // 入力コピー（現在のタブから）
+        async copyInput() {
+            const inputEl = document.getElementById('inputJson');
+            const input = inputEl.value;
+            
+            if (!input) {
+                this.showError('コピーする内容がありません');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(input);
+                this.showSuccess('クリップボードにコピーしました');
+            } catch (error) {
+                inputEl.select();
+                document.execCommand('copy');
+                this.showSuccess('クリップボードにコピーしました');
+            }
+        }
+        
+        // URLデコード（現在のタブに対して）
+        urlDecode() {
+            const inputEl = document.getElementById('inputJson');
+            const input = inputEl.value.trim();
+            
+            if (!input) {
+                this.showError('デコードする文字列を入力してください');
+                return;
+            }
+            
+            try {
+                const decoded = decodeURIComponent(input);
+                inputEl.value = decoded;
+                this.showSuccess('URLデコードしました');
+                this.updateCharCount();
+                this.saveTabs();
+            } catch (error) {
+                this.showError('URLデコードに失敗しました');
+            }
+        }
+        
+        // URLエンコード（現在のタブに対して）
+        urlEncode() {
+            const inputEl = document.getElementById('inputJson');
+            const input = inputEl.value.trim();
+            
+            if (!input) {
+                this.showError('エンコードする文字列を入力してください');
+                return;
+            }
+            
+            try {
+                const encoded = encodeURIComponent(input);
+                inputEl.value = encoded;
+                this.showSuccess('URLエンコードしました');
+                this.updateCharCount();
+                this.saveTabs();
+            } catch (error) {
+                this.showError('URLエンコードに失敗しました');
+            }
+        }
+        
+        // サンプル読み込み（現在のタブに対して）
+        loadExample(type) {
+            const inputEl = document.getElementById('inputJson');
+            const examples = {
+                simple: '{"name": "John", "age": 30, "city": "Tokyo"}',
+                nested: '{"user": {"name": "Alice", "profile": {"age": 25, "country": "Japan"}}, "status": "active"}',
+                array: '{"users": [{"id": 1, "name": "Bob"}, {"id": 2, "name": "Carol"}], "total": 2}',
+                complex: '{"data": {"items": [{"id": 1, "values": [10, 20, 30]}, {"id": 2, "values": [40, 50]}], "meta": {"count": 2, "timestamp": "2024-01-01"}}, "success": true}'
+            };
+            
+            inputEl.value = examples[type] || examples.simple;
+            this.updateCharCount();
+            this.saveTabs();
+            this.closeAllMenus();
+            this.showSuccess('サンプルを読み込みました');
+        }
+        
+        // キーをソートしてJSON整形
+        formatWithSortedKeys(obj, indentSize) {
+            const sortedObj = this.sortObjectKeys(obj);
+            return JSON.stringify(sortedObj, null, indentSize);
+        }
+        
+        // オブジェクトのキーを再帰的にソート
+        sortObjectKeys(obj) {
+            if (Array.isArray(obj)) {
+                return obj.map(item => this.sortObjectKeys(item));
+            } else if (obj !== null && typeof obj === 'object') {
+                return Object.keys(obj)
+                    .sort()
+                    .reduce((sorted, key) => {
+                        sorted[key] = this.sortObjectKeys(obj[key]);
+                        return sorted;
+                    }, {});
+            }
+            return obj;
+        }
+        
+        // 統計情報更新
+        updateStats(parsed, formatted) {
+            const lines = formatted.split('\n').length;
+            const depth = this.getMaxDepth(parsed);
+            const keys = this.countKeys(parsed);
+            
+            document.getElementById('statLines').textContent = lines;
+            document.getElementById('statDepth').textContent = depth;
+            document.getElementById('statKeys').textContent = keys;
+        }
+        
+        // 最大深度取得
+        getMaxDepth(obj, currentDepth = 0) {
+            if (obj === null || typeof obj !== 'object') {
+                return currentDepth;
+            }
+            
+            const depths = Object.values(obj).map(value => 
+                this.getMaxDepth(value, currentDepth + 1)
+            );
+            
+            return Math.max(currentDepth, ...depths);
+        }
+        
+        // キー数カウント
+        countKeys(obj) {
+            let count = 0;
+            
+            const traverse = (o) => {
+                if (o !== null && typeof o === 'object') {
+                    if (!Array.isArray(o)) {
+                        count += Object.keys(o).length;
+                    }
+                    Object.values(o).forEach(traverse);
+                }
+            };
+            
+            traverse(obj);
+            return count;
+        }
+        
+        // 統計情報クリア
+        clearStats() {
+            document.getElementById('statLines').textContent = '-';
+            document.getElementById('statDepth').textContent = '-';
+            document.getElementById('statKeys').textContent = '-';
+        }
+        
+        // 成功メッセージ表示
+        showSuccess(message) {
+            const el = document.getElementById('successMessage');
+            el.textContent = message;
+            el.classList.add('show');
+            
+            setTimeout(() => {
+                el.classList.remove('show');
+            }, 3000);
+        }
+        
+        // エラーメッセージ表示
+        showError(message) {
+            const el = document.getElementById('errorMessage');
+            el.textContent = message;
+            el.classList.add('show');
+            
+            setTimeout(() => {
+                el.classList.remove('show');
+            }, 3000);
+        }
+        
+        // メニュー開閉
+        toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            const isActive = menu.classList.contains('active');
+            
+            this.closeAllMenus();
+            
+            if (!isActive) {
+                menu.classList.add('active');
+            }
+        }
+        
+        closeAllMenus() {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.classList.remove('active');
+            });
+        }
+        
+        // データエクスポート
+        // データエクスポート
+        // データエクスポート
+        async exportData() {
+            // 現在のタブデータを保存
+            this.saveCurrentTabData();
+            
+            const data = {
+                version: this.VERSION,
+                tabs: this.tabs,
+                exportDate: new Date().toISOString()
+            };
+            
+            const jsonString = JSON.stringify(data, null, 2);
+            const fileName = `json-formatter-backup-${Date.now()}.json`;
+            
+            try {
+                // File System Access API（Chrome/Edge）
+                if ('showSaveFilePicker' in window) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: [{
+                            description: 'JSON Files',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    
+                    const writable = await handle.createWritable();
+                    await writable.write(jsonString);
+                    await writable.close();
+                    
+                    this.showSuccess('データを保存しました');
+                } else {
+                    // フォールバック：従来のダウンロード方式
+                    const blob = new Blob([jsonString], {
+                        type: 'application/json'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    link.click();
+                    
+                    URL.revokeObjectURL(url);
+                    this.showSuccess('データを保存しました');
+                }
+            } catch (error) {
+                // ユーザーがキャンセルした場合
+                if (error.name === 'AbortError') {
+                    console.log('保存がキャンセルされました');
+                } else {
+                    console.error('保存エラー:', error);
+                    this.showError('保存に失敗しました');
+                }
+            }
+            
+            this.closeAllMenus();
+        }
+        
+        // データインポート
+        importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,.txt';
+            
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                try {
+                    const text = await file.text();
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    
+                    if (extension === 'json') {
+                        try {
+                            const data = JSON.parse(text);
+                            
+                            // タブデータとして読み込み
+                            if (data.version && data.tabs && Array.isArray(data.tabs)) {
+                                this.tabs = data.tabs;
+                                this.activeTabIndex = 0;
+                                this.nextTabId = Math.max(...this.tabs.map(t => t.id || 0)) + 1;
+                                this.renderTabs();
+                                this.loadTabContent(0);
+                                this.saveTabs();
+                                this.showSuccess('バックアップデータを読み込みました');
+                            } else {
+                                // 通常のJSONファイル：現在のタブのinputに読み込み
+                                const inputEl = document.getElementById('inputJson');
+                                if (inputEl) inputEl.value = text;
+                                this.updateCharCount();
+                                this.saveTabs();
+                                this.showSuccess('JSONファイルを読み込みました');
+                            }
+                        } catch (parseError) {
+                            // パースできない場合はテキストとして読み込み
+                            const inputEl = document.getElementById('inputJson');
+                            if (inputEl) inputEl.value = text;
+                            this.updateCharCount();
+                            this.saveTabs();
+                            this.showSuccess('ファイルを読み込みました');
+                        }
+                    } else if (extension === 'txt') {
+                        // テキストファイルの場合：inputに読み込み
+                        const inputEl = document.getElementById('inputJson');
+                        if (inputEl) inputEl.value = text;
+                        this.updateCharCount();
+                        this.saveTabs();
+                        this.showSuccess('テキストファイルを読み込みました');
+                    } else {
+                        // その他のファイル：テキストとして読み込み
+                        const inputEl = document.getElementById('inputJson');
+                        if (inputEl) inputEl.value = text;
+                        this.updateCharCount();
+                        this.saveTabs();
+                        this.showSuccess('ファイルを読み込みました');
+                    }
+                    
+                } catch (error) {
+                    this.showError('ファイルの読み込みに失敗しました: ' + error.message);
+                }
+            };
+            
+            input.click();
+            this.closeAllMenus();
+        }
+    }
+    
+    // ===========================
+    // アプリケーション起動
+    // ===========================
+    const app = new JSONFormatterApp();
+    
+    // グローバルエラーハンドリング
+    window.addEventListener('error', (e) => {
+        console.error('Global error:', e);
+    });
+</script>
+
+</body>
+</html>
