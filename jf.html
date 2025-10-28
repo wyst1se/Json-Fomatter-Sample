@@ -10,10 +10,10 @@
         :root {
             --spacing-company: 1rem;
         }
-
-    /* ライトテーマ（デフォルト） */
+    /* ライトテーマ（デフォルト & auto） */
     :root,
-    [data-theme="light"] {
+    [data-theme="light"],
+    [data-theme="auto"] {
         --background-color: #ffffff;
         --card-background-color: #f8f9fa;
         --text-color: #1f2937;
@@ -44,22 +44,7 @@
         --shadow-color: rgba(0, 0, 0, 0.3);
     }
     
-    /* システムテーマ（自動） */
-    [data-theme="auto"] {
-        --background-color: #ffffff;
-        --card-background-color: #f8f9fa;
-        --text-color: #1f2937;
-        --muted-color: #6b7280;
-        --border-color: #e5e7eb;
-        --primary: #2563eb;
-        --primary-hover: #eff6ff;
-        --button-background: #ffffff;
-        --button-border: #d1d5db;
-        --success-color: #10b981;
-        --error-color: #ef4444;
-        --shadow-color: rgba(0, 0, 0, 0.1);
-    }
-    
+    /* autoテーマのダークモード */
     @media (prefers-color-scheme: dark) {
         [data-theme="auto"] {
             --background-color: #1a1a1a;
@@ -194,9 +179,10 @@
         color: white;
     }
     
-    .add-tab-btn {
-        width: 32px;
-        height: 32px;
+    /* ボタン共通スタイル */
+    .add-tab-btn,
+    .btn-icon,
+    .copy-btn-overlay {
         padding: 0;
         border: none;
         background: transparent;
@@ -206,6 +192,11 @@
         align-items: center;
         justify-content: center;
         transition: all 0.2s;
+    }
+    
+    .add-tab-btn {
+        width: 32px;
+        height: 32px;
         color: var(--muted-color);
         flex-shrink: 0;
     }
@@ -341,14 +332,6 @@
     .btn-icon {
         padding: 0.5rem;
         min-width: auto;
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
         color: var(--text-color);
         width: 36px;
         height: 36px;
@@ -404,9 +387,11 @@
         line-height: 1.5;
         background: transparent;
         border-right: 1px solid var(--border-color);
-        overflow: hidden;
+        overflow-y: hidden;
         min-width: 3rem;
         white-space: pre;
+        height: 400px;
+        max-height: 400px;
     }
     
     .copy-btn-overlay {
@@ -416,15 +401,7 @@
         z-index: 10;
         width: 28px;
         height: 28px;
-        padding: 0;
-        border: none;
         background: rgba(128, 128, 128, 0.1);
-        cursor: pointer;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
         color: var(--muted-color);
         opacity: 0.6;
     }
@@ -483,11 +460,6 @@
         white-space: pre;
         height: 400px;
         max-height: 400px;
-    }
-        background: var(--card-background-color);
-        color: var(--text-color);
-        border: 1px solid var(--border-color);
-        transition: background-color 0.3s, color 0.3s, border-color 0.3s;
     }
     
     .status-bar {
@@ -748,12 +720,10 @@
         color: white;
     }
 </style>
-
 </head>
 <body>
     <div class="error-message" id="errorMessage"></div>
     <div class="success-message" id="successMessage"></div>
-
 <div class="header">
     <h1>JSON Formatter</h1>
     <div class="settings-button">
@@ -935,14 +905,19 @@
     // ===========================
     class JSONFormatterApp {
         constructor() {
+            // 定数
             this.VERSION = '2.0.0';
             this.STORAGE_KEY = 'json_formatter_tabs';
             this.THEME_KEY = 'json_formatter_theme';
+            this.MAX_DEPTH = 10; // ネストJSON整形の最大深度
+            this.MESSAGE_TIMEOUT = 3000; // メッセージ表示時間（ms）
             
+            // 状態管理
             this.tabs = [];
             this.activeTabIndex = 0;
             this.nextTabId = 1;
             this.indentSize = 2;
+            this.messageTimeout = null;
             
             this.init();
         }
@@ -1528,81 +1503,88 @@
             let i = 0;
             
             while (i < str.length) {
-                const char = str[i];
-                
-                // : の後の文字列値を探す
-                if (char === ':') {
-                    result += char;
-                    i++;
-                    
-                    // 空白をスキップ
-                    while (i < str.length && /\s/.test(str[i])) {
-                        result += str[i];
-                        i++;
-                    }
-                    
-                    // " で始まる文字列値
-                    if (i < str.length && str[i] === '"') {
-                        result += '"';
-                        i++;
-                        
-                        // 文字列の終わりを見つける
-                        let valueStr = '';
-                        let depth = 0;
-                        let foundEnd = false;
-                        
-                        while (i < str.length && !foundEnd) {
-                            const c = str[i];
-                            
-                            if (c === '\\') {
-                                valueStr += c;
-                                i++;
-                                if (i < str.length) {
-                                    valueStr += str[i];
-                                    i++;
-                                }
-                                continue;
-                            }
-                            
-                            // { [ の深さを追跡
-                            if (c === '{' || c === '[') {
-                                depth++;
-                                valueStr += c;
-                                i++;
-                            } else if (c === '}' || c === ']') {
-                                depth--;
-                                valueStr += c;
-                                i++;
-                            } else if (c === '"') {
-                                if (depth === 0) {
-                                    // 文字列値の終わり
-                                    foundEnd = true;
-                                    result += valueStr + '"';
-                                    i++;
-                                } else {
-                                    // ネストされたJSON内の引用符はエスケープ
-                                    valueStr += '\\"';
-                                    i++;
-                                }
-                            } else {
-                                valueStr += c;
-                                i++;
-                            }
-                        }
-                        
-                        if (!foundEnd) {
-                            result += valueStr;
-                        }
-                    } else {
-                        continue;
-                    }
+                if (str[i] === ':') {
+                    const { fixed, newIndex } = this.processJsonValue(str, i);
+                    result += fixed;
+                    i = newIndex;
                 } else {
-                    result += char;
+                    result += str[i];
                     i++;
                 }
             }
             
             return result;
+        }
+        
+        // JSON値を処理（:の後の文字列値）
+        processJsonValue(str, colonIndex) {
+            let result = ':';
+            let i = colonIndex + 1;
+            
+            // 空白をスキップ
+            while (i < str.length && /\s/.test(str[i])) {
+                result += str[i];
+                i++;
+            }
+            
+            // 文字列値の処理
+            if (i < str.length && str[i] === '"') {
+                const { value, endIndex } = this.processStringValue(str, i);
+                result += value;
+                i = endIndex;
+            }
+            
+            return { fixed: result, newIndex: i };
+        }
+        
+        // 文字列値を処理（ネストされたJSONの引用符をエスケープ）
+        processStringValue(str, startIndex) {
+            let result = '"';
+            let i = startIndex + 1;
+            let depth = 0;
+            let foundEnd = false;
+            
+            while (i < str.length && !foundEnd) {
+                const c = str[i];
+                
+                // バックスラッシュのエスケープ処理
+                if (c === '\\') {
+                    result += c;
+                    i++;
+                    if (i < str.length) {
+                        result += str[i];
+                        i++;
+                    }
+                    continue;
+                }
+                
+                // 深さの追跡
+                if (c === '{' || c === '[') {
+                    depth++;
+                    result += c;
+                    i++;
+                } else if (c === '}' || c === ']') {
+                    depth--;
+                    result += c;
+                    i++;
+                } else if (c === '"') {
+                    if (depth === 0) {
+                        // 文字列値の終わり
+                        foundEnd = true;
+                        result += '"';
+                        i++;
+                    } else {
+                        // ネストされたJSON内の引用符はエスケープ
+                        result += '\\"';
+                        i++;
+                    }
+                } else {
+                    result += c;
+                    i++;
+                }
+            }
+            
+            return { value: result, endIndex: i };
         }
         
         // 文字列値内のエスケープシーケンスを変換し、インデントを調整
@@ -1667,63 +1649,53 @@
         // 文字列内のJSONを整形（文字列のまま保持）
         formatNestedJsonAsString(obj, depth = 0) {
             // 無限ループ防止
-            if (depth > 10) {
-                return obj;
+            if (depth > this.MAX_DEPTH) return obj;
+            
+            // 文字列の場合：JSONとしてパースを試みる
+            if (typeof obj === 'string') {
+                return this.tryParseStringAsJson(obj, depth);
             }
             
-            if (typeof obj === 'string') {
-                const trimmed = obj.trim();
-                
-                // JSON構造の開始・終了をチェック
-                if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-                    (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-                    try {
-                        // JSONとしてパース
-                        const parsed = JSON.parse(trimmed);
-                        
-                        // オブジェクトか配列の場合のみ再帰処理
-                        if (typeof parsed === 'object' && parsed !== null) {
-                            // 再帰的に内部もチェック
-                            const recursivelyFormatted = this.formatNestedJsonAsString(parsed, depth + 1);
-                            
-                            // 整形して文字列として返す
-                            const formatted = JSON.stringify(recursivelyFormatted, null, this.indentSize);
-                            return formatted;
-                        } else {
-                            // プリミティブ値ならそのまま
-                            return obj;
-                        }
-                    } catch (e) {
-                        // パースエラーの場合はそのまま返す
-                        return obj;
-                    }
-                }
-                return obj;
-                
-            } else if (Array.isArray(obj)) {
-                // 配列の各要素を処理
-                return obj.map(item => {
-                    try {
-                        return this.formatNestedJsonAsString(item, depth);
-                    } catch (e) {
-                        return item;
-                    }
-                });
-                
-            } else if (obj !== null && typeof obj === 'object') {
-                // オブジェクトの各プロパティを処理
+            // 配列の場合：各要素を再帰処理
+            if (Array.isArray(obj)) {
+                return obj.map(item => this.formatNestedJsonAsString(item, depth));
+            }
+            
+            // オブジェクトの場合：各プロパティを再帰処理
+            if (obj !== null && typeof obj === 'object') {
                 const result = {};
                 for (const key in obj) {
-                    try {
-                        result[key] = this.formatNestedJsonAsString(obj[key], depth);
-                    } catch (e) {
-                        result[key] = obj[key];
-                    }
+                    result[key] = this.formatNestedJsonAsString(obj[key], depth);
                 }
                 return result;
             }
             
             return obj;
+        }
+        
+        // 文字列をJSONとしてパースして整形
+        tryParseStringAsJson(str, depth) {
+            const trimmed = str.trim();
+            
+            // JSON構造のチェック
+            if (!((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+                  (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
+                return str;
+            }
+            
+            try {
+                const parsed = JSON.parse(trimmed);
+                
+                // オブジェクトまたは配列の場合のみ再帰処理
+                if (typeof parsed === 'object' && parsed !== null) {
+                    const formatted = this.formatNestedJsonAsString(parsed, depth + 1);
+                    return JSON.stringify(formatted, null, this.indentSize);
+                }
+            } catch (e) {
+                // パースエラーは無視
+            }
+            
+            return str;
         }
         
         // JSON圧縮（現在のタブに対して）
@@ -1888,10 +1860,20 @@
         
         // 統計情報更新
         updateStats(parsed, formatted) {
-            const lines = formatted.split('\n').length;
-            const depth = this.getMaxDepth(parsed);
-            const keys = this.countKeys(parsed);
-            
+            this.setStatValues({
+                lines: formatted.split('\n').length,
+                depth: this.getMaxDepth(parsed),
+                keys: this.countKeys(parsed)
+            });
+        }
+        
+        // 統計情報クリア
+        clearStats() {
+            this.setStatValues({ lines: '-', depth: '-', keys: '-' });
+        }
+        
+        // 統計値を設定
+        setStatValues({ lines, depth, keys }) {
             document.getElementById('statLines').textContent = lines;
             document.getElementById('statDepth').textContent = depth;
             document.getElementById('statKeys').textContent = keys;
@@ -1926,34 +1908,34 @@
             traverse(obj);
             return count;
         }
+
         
-        // 統計情報クリア
-        clearStats() {
-            document.getElementById('statLines').textContent = '-';
-            document.getElementById('statDepth').textContent = '-';
-            document.getElementById('statKeys').textContent = '-';
+        // メッセージ表示（成功・エラー共通）
+        showMessage(message, type = 'success') {
+            const elementId = type === 'success' ? 'successMessage' : 'errorMessage';
+            const el = document.getElementById(elementId);
+            
+            if (!el) return;
+            
+            // 既存のタイムアウトをクリア
+            if (this.messageTimeout) {
+                clearTimeout(this.messageTimeout);
+            }
+            
+            el.textContent = message;
+            el.classList.add('show');
+            
+            this.messageTimeout = setTimeout(() => {
+                el.classList.remove('show');
+            }, this.MESSAGE_TIMEOUT);
         }
         
-        // 成功メッセージ表示
         showSuccess(message) {
-            const el = document.getElementById('successMessage');
-            el.textContent = message;
-            el.classList.add('show');
-            
-            setTimeout(() => {
-                el.classList.remove('show');
-            }, 3000);
+            this.showMessage(message, 'success');
         }
         
-        // エラーメッセージ表示
         showError(message) {
-            const el = document.getElementById('errorMessage');
-            el.textContent = message;
-            el.classList.add('show');
-            
-            setTimeout(() => {
-                el.classList.remove('show');
-            }, 3000);
+            this.showMessage(message, 'error');
         }
         
         // メニュー開閉
@@ -2113,6 +2095,5 @@
         console.error('Global error:', e);
     });
 </script>
-
 </body>
 </html>
