@@ -10,7 +10,6 @@
         :root {
             --spacing-company: 1rem;
         }
-
     /* ライトテーマ（デフォルト） */
     :root,
     [data-theme="light"] {
@@ -1365,8 +1364,11 @@
             }
             
             try {
-                const parsed = JSON.parse(input);
+                let parsed = JSON.parse(input);
                 const sortKeys = document.getElementById('sortKeys').checked;
+                
+                // ネストされたJSON文字列を自動的に検出して整形
+                parsed = this.parseNestedJson(parsed);
                 
                 const formatted = sortKeys ? 
                     this.formatWithSortedKeys(parsed, this.indentSize) :
@@ -1382,6 +1384,34 @@
                 this.showError(`JSONパースエラー: ${error.message}`);
                 this.clearStats();
             }
+        }
+        
+        // ネストされたJSON文字列を再帰的にパース
+        parseNestedJson(obj) {
+            if (typeof obj === 'string') {
+                // 文字列がJSONかどうか試す
+                try {
+                    const trimmed = obj.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+                        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                        const parsed = JSON.parse(trimmed);
+                        // 再帰的に処理
+                        return this.parseNestedJson(parsed);
+                    }
+                } catch (e) {
+                    // JSONでなければそのまま返す
+                }
+                return obj;
+            } else if (Array.isArray(obj)) {
+                return obj.map(item => this.parseNestedJson(item));
+            } else if (obj !== null && typeof obj === 'object') {
+                const result = {};
+                for (const key in obj) {
+                    result[key] = this.parseNestedJson(obj[key]);
+                }
+                return result;
+            }
+            return obj;
         }
         
         // JSON圧縮（現在のタブに対して）
