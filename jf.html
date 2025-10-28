@@ -451,17 +451,38 @@
     textarea {
         font-family: 'Courier New', Courier, monospace;
         font-size: 13px;
+        height: 400px;
         min-height: 400px;
-        resize: vertical;
+        max-height: 400px;
+        resize: none;
         flex: 1;
         line-height: 1.5;
         padding: 0.75rem;
         border: none;
         background: transparent;
+        overflow-y: auto;
     }
     
     textarea:focus {
         outline: none;
+    }
+    
+    .line-numbers {
+        padding: 0.75rem 0.5rem;
+        text-align: right;
+        user-select: none;
+        color: var(--muted-color);
+        opacity: 0.25;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        background: transparent;
+        border-right: 1px solid var(--border-color);
+        overflow-y: hidden;
+        min-width: 3rem;
+        white-space: pre;
+        height: 400px;
+        max-height: 400px;
     }
         background: var(--card-background-color);
         color: var(--text-color);
@@ -480,16 +501,19 @@
     
     .stats-inline {
         display: flex;
-        gap: 1rem;
+        gap: 0.5rem;
+        font-size: 0.75rem;
     }
     
     .stat-item {
         display: flex;
-        gap: 0.25rem;
+        gap: 0.2rem;
+        color: var(--muted-color);
     }
     
     .stat-item span:first-child {
         font-weight: 600;
+        color: var(--text-color);
     }
     
     .error-message, .success-message {
@@ -1435,12 +1459,12 @@
         }
         
         // スクロール同期
-        syncScroll(sourceId, targetId) {
-            const source = document.getElementById(sourceId);
-            const target = document.getElementById(targetId);
+        syncScroll(textareaId, lineNumbersId) {
+            const textarea = document.getElementById(textareaId);
+            const lineNumbers = document.getElementById(lineNumbersId);
             
-            if (source && target) {
-                target.scrollTop = source.scrollTop;
+            if (textarea && lineNumbers) {
+                lineNumbers.scrollTop = textarea.scrollTop;
             }
         }
         
@@ -1448,7 +1472,7 @@
         format() {
             const inputEl = document.getElementById('inputJson');
             const outputEl = document.getElementById('outputJson');
-            const input = inputEl.value.trim();
+            let input = inputEl.value.trim();
             
             if (!input) {
                 this.showError('JSONを入力してください');
@@ -1456,55 +1480,249 @@
             }
             
             try {
-                let parsed = JSON.parse(input);
+                // まず通常のパースを試す
+                let parsed;
+                try {
+                    parsed = JSON.parse(input);
+                } catch (firstError) {
+                    // パースに失敗したら自動修正を試みる
+                    console.log('通常パース失敗、自動修正を試みます');
+                    const fixed = this.smartFixJson(input);
+                    console.log('修正後:', fixed);
+                    parsed = JSON.parse(fixed);
+                    console.log('自動修正成功！');
+                }
+                
                 const sortKeys = document.getElementById('sortKeys').checked;
                 
-                // 文字列内のJSONを検出して整形
-                parsed = this.formatNestedJsonStrings(parsed);
+                // 文字列内のJSONを整形（文字列として保持）
+                try {
+                    parsed = this.formatNestedJsonAsString(parsed);
+                } catch (nestedError) {
+                    console.log('Nested JSON formatting failed:', nestedError);
+                }
                 
                 const formatted = sortKeys ? 
                     this.formatWithSortedKeys(parsed, this.indentSize) :
                     JSON.stringify(parsed, null, this.indentSize);
                 
-                outputEl.value = formatted;
-                this.updateStats(parsed, formatted);
+                // 文字列値内の\nを実際の改行に変換し、インデントを調整
+                const finalOutput = this.unescapeAndFixIndent(formatted);
+                
+                outputEl.value = finalOutput;
+                this.updateStats(parsed, finalOutput);
                 this.showSuccess('JSONを整形しました');
                 this.updateCharCount();
                 this.saveTabs();
                 
             } catch (error) {
+                console.error('Format error:', error);
                 this.showError(`JSONパースエラー: ${error.message}`);
                 this.clearStats();
             }
         }
         
-        // 文字列内のJSONを検出して整形（文字列のまま）
-        formatNestedJsonStrings(obj) {
-            if (typeof obj === 'string') {
-                // 文字列がJSONかどうか判定
-                try {
-                    const trimmed = obj.trim();
-                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-                        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-                        // JSONとしてパースできるか試す
-                        const parsed = JSON.parse(trimmed);
-                        // パース成功したら整形して文字列として返す
-                        const formatted = JSON.stringify(parsed, null, this.indentSize);
-                        return formatted;
+        // スマート自動修正（値部分の文字列内の引用符をエスケープ）
+        smartFixJson(str) {
+            let result = '';
+            let i = 0;
+            
+            while (i < str.length) {
+                const char = str[i];
+                
+                // : の後の文字列値を探す
+                if (char === ':') {
+                    result += char;
+                    i++;
+                    
+                    // 空白をスキップ
+                    while (i < str.length && /\s/.test(str[i])) {
+                        result += str[i];
+                        i++;
                     }
-                } catch (e) {
-                    // JSONでなければそのまま返す
+                    
+                    // " で始まる文字列値
+                    if (i < str.length && str[i] === '"') {
+                        result += '"';
+                        i++;
+                        
+                        // 文字列の終わりを見つける
+                        let valueStr = '';
+                        let depth = 0;
+                        let foundEnd = false;
+                        
+                        while (i < str.length && !foundEnd) {
+                            const c = str[i];
+                            
+                            if (c === '\\') {
+                                valueStr += c;
+                                i++;
+                                if (i < str.length) {
+                                    valueStr += str[i];
+                                    i++;
+                                }
+                                continue;
+                            }
+                            
+                            // { [ の深さを追跡
+                            if (c === '{' || c === '[') {
+                                depth++;
+                                valueStr += c;
+                                i++;
+                            } else if (c === '}' || c === ']') {
+                                depth--;
+                                valueStr += c;
+                                i++;
+                            } else if (c === '"') {
+                                if (depth === 0) {
+                                    // 文字列値の終わり
+                                    foundEnd = true;
+                                    result += valueStr + '"';
+                                    i++;
+                                } else {
+                                    // ネストされたJSON内の引用符はエスケープ
+                                    valueStr += '\\"';
+                                    i++;
+                                }
+                            } else {
+                                valueStr += c;
+                                i++;
+                            }
+                        }
+                        
+                        if (!foundEnd) {
+                            result += valueStr;
+                        }
+                    } else {
+                        continue;
+                    }
+                } else {
+                    result += char;
+                    i++;
+                }
+            }
+            
+            return result;
+        }
+        
+        // 文字列値内のエスケープシーケンスを変換し、インデントを調整
+        unescapeAndFixIndent(str) {
+            let result = '';
+            let inString = false;
+            let currentIndent = 0;
+            
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                const next = i < str.length - 1 ? str[i + 1] : '';
+                const prev = i > 0 ? str[i - 1] : '';
+                
+                // 行の開始位置でインデントレベルを計算
+                if (i === 0 || str[i - 1] === '\n') {
+                    let spaces = 0;
+                    let j = i;
+                    while (j < str.length && str[j] === ' ') {
+                        spaces++;
+                        j++;
+                    }
+                    currentIndent = spaces;
+                }
+                
+                // 文字列の開始・終了を追跡
+                if (char === '"' && prev !== '\\') {
+                    if (!inString) {
+                        inString = true;
+                    } else {
+                        inString = false;
+                    }
+                    result += char;
+                    continue;
+                }
+                
+                // 文字列内のエスケープシーケンスを処理
+                if (inString && char === '\\') {
+                    if (next === 'n') {
+                        // \n → 実際の改行 + 現在のインデント
+                        result += '\n' + ' '.repeat(currentIndent);
+                        i++;
+                        continue;
+                    } else if (next === '"') {
+                        // \" → "
+                        result += '"';
+                        i++;
+                        continue;
+                    } else if (next === '\\') {
+                        // \\ → \
+                        result += '\\';
+                        i++;
+                        continue;
+                    }
+                }
+                
+                result += char;
+            }
+            
+            return result;
+        }
+        
+        // 文字列内のJSONを整形（文字列のまま保持）
+        formatNestedJsonAsString(obj, depth = 0) {
+            // 無限ループ防止
+            if (depth > 10) {
+                return obj;
+            }
+            
+            if (typeof obj === 'string') {
+                const trimmed = obj.trim();
+                
+                // JSON構造の開始・終了をチェック
+                if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+                    (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                    try {
+                        // JSONとしてパース
+                        const parsed = JSON.parse(trimmed);
+                        
+                        // オブジェクトか配列の場合のみ再帰処理
+                        if (typeof parsed === 'object' && parsed !== null) {
+                            // 再帰的に内部もチェック
+                            const recursivelyFormatted = this.formatNestedJsonAsString(parsed, depth + 1);
+                            
+                            // 整形して文字列として返す
+                            const formatted = JSON.stringify(recursivelyFormatted, null, this.indentSize);
+                            return formatted;
+                        } else {
+                            // プリミティブ値ならそのまま
+                            return obj;
+                        }
+                    } catch (e) {
+                        // パースエラーの場合はそのまま返す
+                        return obj;
+                    }
                 }
                 return obj;
+                
             } else if (Array.isArray(obj)) {
-                return obj.map(item => this.formatNestedJsonStrings(item));
+                // 配列の各要素を処理
+                return obj.map(item => {
+                    try {
+                        return this.formatNestedJsonAsString(item, depth);
+                    } catch (e) {
+                        return item;
+                    }
+                });
+                
             } else if (obj !== null && typeof obj === 'object') {
+                // オブジェクトの各プロパティを処理
                 const result = {};
                 for (const key in obj) {
-                    result[key] = this.formatNestedJsonStrings(obj[key]);
+                    try {
+                        result[key] = this.formatNestedJsonAsString(obj[key], depth);
+                    } catch (e) {
+                        result[key] = obj[key];
+                    }
                 }
                 return result;
             }
+            
             return obj;
         }
         
@@ -1895,5 +2113,6 @@
         console.error('Global error:', e);
     });
 </script>
+
 </body>
 </html>
