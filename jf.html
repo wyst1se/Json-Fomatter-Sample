@@ -10,6 +10,7 @@
         :root {
             --spacing-company: 1rem;
         }
+
     /* ライトテーマ（デフォルト） */
     :root,
     [data-theme="light"] {
@@ -380,6 +381,32 @@
     
     .textarea-container {
         position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .editor-wrapper {
+        position: relative;
+        display: flex;
+        background: var(--card-background-color);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .line-numbers {
+        padding: 0.75rem 0.5rem;
+        text-align: right;
+        user-select: none;
+        color: var(--muted-color);
+        opacity: 0.25;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        background: transparent;
+        border-right: 1px solid var(--border-color);
+        overflow: hidden;
+        min-width: 3rem;
+        white-space: pre;
     }
     
     .copy-btn-overlay {
@@ -426,8 +453,16 @@
         font-size: 13px;
         min-height: 400px;
         resize: vertical;
-        width: 100%;
+        flex: 1;
         line-height: 1.5;
+        padding: 0.75rem;
+        border: none;
+        background: transparent;
+    }
+    
+    textarea:focus {
+        outline: none;
+    }
         background: var(--card-background-color);
         color: var(--text-color);
         border: 1px solid var(--border-color);
@@ -689,14 +724,12 @@
         color: white;
     }
 </style>
-```
 
 </head>
 <body>
     <div class="error-message" id="errorMessage"></div>
     <div class="success-message" id="successMessage"></div>
 
-```
 <div class="header">
     <h1>JSON Formatter</h1>
     <div class="settings-button">
@@ -827,12 +860,15 @@
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
         </button>
-        <textarea 
-            id="inputJson" 
-            placeholder='{"key": "value"}'
-            spellcheck="false"
-            aria-label="入力JSON"
-        ></textarea>
+        <div class="editor-wrapper">
+            <div class="line-numbers" id="inputLineNumbers">1</div>
+            <textarea 
+                id="inputJson" 
+                placeholder='{"key": "value"}'
+                spellcheck="false"
+                aria-label="入力JSON"
+            ></textarea>
+        </div>
         <div class="status-bar">
             <span id="inputCount">0 chars</span>
         </div>
@@ -846,13 +882,16 @@
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
         </button>
-        <textarea 
-            id="outputJson" 
-            placeholder="整形されたJSONがここに表示されます"
-            readonly
-            spellcheck="false"
-            aria-label="出力JSON"
-        ></textarea>
+        <div class="editor-wrapper">
+            <div class="line-numbers" id="outputLineNumbers">1</div>
+            <textarea 
+                id="outputJson" 
+                placeholder="整形されたJSONがここに表示されます"
+                readonly
+                spellcheck="false"
+                aria-label="出力JSON"
+            ></textarea>
+        </div>
         <div class="status-bar">
             <span id="outputCount">0 chars</span>
             <div class="stats-inline" id="statsInline">
@@ -1310,6 +1349,22 @@
                 }
             });
             
+            // スクロール同期
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            
+            if (inputEl) {
+                inputEl.addEventListener('scroll', () => {
+                    this.syncScroll('inputJson', 'inputLineNumbers');
+                });
+            }
+            
+            if (outputEl) {
+                outputEl.addEventListener('scroll', () => {
+                    this.syncScroll('outputJson', 'outputLineNumbers');
+                });
+            }
+            
             // キーボードショートカット
             document.addEventListener('keydown', (e) => {
                 if (e.ctrlKey || e.metaKey) {
@@ -1350,6 +1405,43 @@
             if (outputEl && outputCountEl) {
                 outputCountEl.textContent = `${outputEl.value.length} chars`;
             }
+            
+            // 行番号を更新
+            this.updateLineNumbers();
+        }
+        
+        // 行番号を更新
+        updateLineNumbers() {
+            const inputEl = document.getElementById('inputJson');
+            const outputEl = document.getElementById('outputJson');
+            const inputLineNumbers = document.getElementById('inputLineNumbers');
+            const outputLineNumbers = document.getElementById('outputLineNumbers');
+            
+            if (inputEl && inputLineNumbers) {
+                const inputLines = inputEl.value.split('\n').length;
+                inputLineNumbers.textContent = Array.from(
+                    { length: inputLines }, 
+                    (_, i) => i + 1
+                ).join('\n');
+            }
+            
+            if (outputEl && outputLineNumbers) {
+                const outputLines = outputEl.value.split('\n').length;
+                outputLineNumbers.textContent = Array.from(
+                    { length: outputLines }, 
+                    (_, i) => i + 1
+                ).join('\n');
+            }
+        }
+        
+        // スクロール同期
+        syncScroll(sourceId, targetId) {
+            const source = document.getElementById(sourceId);
+            const target = document.getElementById(targetId);
+            
+            if (source && target) {
+                target.scrollTop = source.scrollTop;
+            }
         }
         
         // JSON整形（現在のタブに対して）
@@ -1367,8 +1459,8 @@
                 let parsed = JSON.parse(input);
                 const sortKeys = document.getElementById('sortKeys').checked;
                 
-                // ネストされたJSON文字列を自動的に検出して整形
-                parsed = this.parseNestedJson(parsed);
+                // 文字列内のJSONを検出して整形
+                parsed = this.formatNestedJsonStrings(parsed);
                 
                 const formatted = sortKeys ? 
                     this.formatWithSortedKeys(parsed, this.indentSize) :
@@ -1386,28 +1478,30 @@
             }
         }
         
-        // ネストされたJSON文字列を再帰的にパース
-        parseNestedJson(obj) {
+        // 文字列内のJSONを検出して整形（文字列のまま）
+        formatNestedJsonStrings(obj) {
             if (typeof obj === 'string') {
-                // 文字列がJSONかどうか試す
+                // 文字列がJSONかどうか判定
                 try {
                     const trimmed = obj.trim();
                     if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
                         (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                        // JSONとしてパースできるか試す
                         const parsed = JSON.parse(trimmed);
-                        // 再帰的に処理
-                        return this.parseNestedJson(parsed);
+                        // パース成功したら整形して文字列として返す
+                        const formatted = JSON.stringify(parsed, null, this.indentSize);
+                        return formatted;
                     }
                 } catch (e) {
                     // JSONでなければそのまま返す
                 }
                 return obj;
             } else if (Array.isArray(obj)) {
-                return obj.map(item => this.parseNestedJson(item));
+                return obj.map(item => this.formatNestedJsonStrings(item));
             } else if (obj !== null && typeof obj === 'object') {
                 const result = {};
                 for (const key in obj) {
-                    result[key] = this.parseNestedJson(obj[key]);
+                    result[key] = this.formatNestedJsonStrings(obj[key]);
                 }
                 return result;
             }
@@ -1801,6 +1895,5 @@
         console.error('Global error:', e);
     });
 </script>
-
 </body>
 </html>
